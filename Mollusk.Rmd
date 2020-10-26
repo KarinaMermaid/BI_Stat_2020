@@ -1,0 +1,223 @@
+---
+title: "Mollusks_project_1"
+date: "26/10/2020"
+output:
+html_document:
+toc: true
+toc_depth: 3
+toc_float: true
+number_section: true
+
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(dplyr)
+library(stats)
+library(car)
+library(knitr) 
+theme_set(theme_bw())
+```
+
+## Task 1: file import
+This report presents a statistical analysis of data obtained during the expedition from ten researchers. The observations of each member of the scientific group were obtained in a separate csv file. In this regard, a custom function was written to bring information from a set of files into a single dataframe.
+
+***Note*** For the function to work correctly, you should set as the working directory the folder in which your data is located
+
+***P.S.*** Initially, I wrote a function that took a path to a directory as input, but it did not work on my computer, but it worked on others. To continue working with the project, I had to leave the setwd version.
+
+```{r function for import files, echo=TRUE, warning=FALSE}
+
+# Function for importing csv files.
+## You should specify the path to the data directory
+setwd(dir = )
+importFile <-  function() {
+   files  <- list.files(pattern="*.csv")
+   tables <- lapply(files, read.csv , header = TRUE)
+   combined <- do.call(rbind, tables)
+}
+data_imported <- importFile()
+
+# alternative function
+## You should specify the path to the data directory
+way <- 
+# Function for importing csv files.
+importFile <-  function(path) {
+   files  <- list.files(path = path, pattern="*.csv")
+   tables <- lapply(files, read.csv , header = TRUE)
+   combined <- do.call(rbind, tables)
+}
+
+data_imported <- importFile(way)
+```
+
+
+## Task 2: EDA analysis
+   Before proceeding with the statistical analysis of data, it is necessary to check it for correctness.
+
+   * The first step was to evaluate the data structure. This test showed that some of the continual and discrete values are of type character. In this regard, the values of these variables were checked for the presence of the values indicated by the words. Such values were found and replaced by the corresponding numerical designations or by NA.
+   * For convenience, the name of the sex column has been changed to a more concise name for sex. The data type of this variable has been changed to factor. Also, for a more convenient perception of information, the numerical values of this variable have been replaced with verbal ones. 
+   * The value of the ring variable has been changed to a factor since it is a discrete value. 
+   * The variable length type has been changed to numeric because it is a continuous value. 
+   * For the convenience of calculations and plotting, a dataframe was created similar to the original one, but not containing NA. This will not do much harm to further analysis, since we have more than 4000 observations, while there are only 11 missing values.
+
+
+```{r}
+str(data_imported)
+shell_mol <- rename(data_imported, Sex = Sex..1...male..2...female..3...uvenil.)
+# verbal designation is replaced by logical
+shell_mol[3103, 3] <- NA
+# verbal designation is replaced by number
+shell_mol[3372, 1] <- 9
+# verbal designations are replaced by numbers
+shell_mol[c(618, 1374,1399), 2] <- c('3', '1','1')
+
+shell_mol$Sex <- factor(shell_mol$Sex, labels = c('male', 'female', 'uvenil'))
+
+shell_mol$Rings <-  as.numeric(shell_mol$Rings)
+shell_mol$Rings <-  as.factor(shell_mol$Rings)
+
+shell_mol$Length <- as.numeric(shell_mol$Length)
+
+shell_mol_whithout_NA <- na.omit(shell_mol)
+   
+str(shell_mol)
+```
+
+   Second, the data were checked for outliers. For quick estimate of the variables in which they may occur, a scatter plot matrix was built. Based on it, one can put forward the assumption that there are outliers in variable Height and mayby in Diameter and Lenght. To check this assumption was built qqPlot's. In this pictures, we can see that the values 1001 and 1295 in the Height variable are much higher than others. Since we do not have the opportunity to measure them and, most likely, such observations were obtained as a result of an mistake of researches, they were removed from the dataset. No clear outliers were found in the variables Length and Diameter.
+
+```{r echo=TRUE}
+matrix_plot <- pairs(shell_mol[,3:8])
+```
+
+```{r echo=TRUE}
+qqPlot(shell_mol_whithout_NA$Height)
+
+qqPlot(shell_mol_whithout_NA$Length)
+
+qqPlot(shell_mol_whithout_NA$Diameter)
+
+
+```
+```{r include=FALSE}
+shell_mol <- shell_mol[-1295,]
+shell_mol <- shell_mol[-1001,]
+
+```
+
+### Hypothesis
+   Now our data looks neat and we can work with it. However, before starting the analysis, we need to put forward the hypotheses that we want to test. For this, we, firstly, already have a constructed scatter raft and we can assume the presence of relationships between some variables. Also, as an alternative visualization method, a pairwise correlation matrix between quantitative variables was built. It is worth noting that the resulting matrix should not be taken as testing, since its values need to be carefully checked. We can assume:
+   
+* the presence of a relationship between the weight of a mollusk and its metric parameters, such as length and diameter.
+* the older the mollusk (the more rings it has), the larger its diameter, as well as the greater its weight
+
+
+
+```{r echo=TRUE}
+shell_mol_num <- shell_mol[, 3:8]
+quick_cor <- cor(shell_mol_num,  use = "complete.obs")
+kable(quick_cor)
+
+
+```
+
+
+
+
+
+
+
+
+## Task 3: mean and standard deviation of the Length variable for mollusks of different sexes
+
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+
+lenght_stat <- shell_mol_whithout_NA %>% group_by(Sex) %>% select(Length) %>% summarise(mean = mean(Length, na.rm = T) , sd = sd(Length, na.rm = T))
+
+kable(lenght_stat)
+
+```
+
+## Task 4: what percentage of molluscs has Height less than 0.165
+
+```{r echo=TRUE}
+
+filter_height <- filter(shell_mol, Height < 0.165) %>% count()/count(shell_mol)*100
+round(as.numeric(filter_height), 2)
+```
+
+## Task 5: The Length's variable value that is greater than 92% of all observations
+
+```{r echo=TRUE}
+arrenged_len <- shell_mol %>%  arrange(Length, by_group = T)
+great_len <- arrenged_len[nrow(arrenged_len)*0.92, 3]
+
+kable(great_len)
+```
+
+## Task 6: The value of the Length variable after its standardization
+
+```{r echo=TRUE}
+
+ shell_mol <-  mutate(shell_mol, Lenght_z_scores = scale(shell_mol$Length))
+kable(head(shell_mol))
+```
+
+## Task 7: Comparison of the diameters of mollusks with the number of rings 5 and 15
+
+  A t-test was performed to compare the two groups. According to its results, it can be argued that the diameters of mollusks with 5 and 15 rings have statistically significant differences.
+   A quick glance at a dataset of five-ring molluscs reveals that most of them are juveniles. In contrast, in the sample of mollusks with the number of rings equal to 15, the majority of mollusks were males and females. In this regard, the percentage of juveniles was calculated in both samples: 87 in the sample with the number of rings = 5 and only 10 in the sample with the number of rings = 15.
+   This analysis makes biological sense. The number of rings on a mollusk shell depends on its age. Accordingly, with each new year / ring, the shell diameter of the mollusk also increases, therefore, the older the mollusk, the larger the diameter of its shell.
+    In order to visualize how groups of different sexes differ in diameter, a graph was drawn. It clearly shows that juveniles generally have a smaller diameter than adults, but some juveniles may have the same diameter as necropic adults.
+
+```{r echo=TRUE}
+diam_5 <- shell_mol %>% filter(Rings == 5) %>% select(Diameter)
+diam_15 <-  shell_mol %>% filter(Rings == 15) %>% select(Diameter)
+t.test(diam_5, diam_15, alternative = c( "less"))
+
+uv_rings_5 <- shell_mol %>% filter(Rings == 5) %>%  filter(Sex == 'uvenil') %>% count()
+per_uv_5 <- round(uv_rings_5/nrow(diam_5)*100, 2)
+colnames(per_uv_5) <- "percentage of juveniles"
+kable(per_uv_5)
+
+uv_rings_15 <- shell_mol %>% filter(Rings == 15) %>%  filter(Sex == 'uvenil') %>% count()
+per_uv_15 <- round(uv_rings_15/nrow(diam_15)*100, 2)
+colnames(per_uv_15) <- "percentage of juveniles"
+kable(per_uv_15)
+
+ggplot(shell_mol_whithout_NA, aes(x = Diameter, fill = Sex )) + geom_density(alpha = 0.5) +
+   xlab("Diameter of shell") +
+   ggtitle("The diameter of mollusks of different Sexes")
+
+   
+```
+
+## Task 8: Checking for correlations between variables Diametr and Whole_weight
+
+   A cor.test was performed to check for a correlation between the Diameter and  Whole_weight variables. Since it was still visible on the scatterplot, the graph of the relationship between these two variables don't have a linear form, but has the form of a hyperbola, the Sprearman correlation coefficient was used. Based on the results of the correlation test, we can confirm the hypothesis of a statistically significant correlation between the diameter of the shell of the mollusk and its weight.
+   The graph below illustrates dependence of the weight of the mollusk and the diameter of its shell
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+shell_mol_whithout_NA <- na.omit(shell_mol)
+cor_Diam_Weight <- cor.test(shell_mol_whithout_NA$Diameter, shell_mol_whithout_NA$Whole_weight, method = "spearman")
+cor_Diam_Weight 
+
+ggplot(shell_mol_whithout_NA, aes(x = Whole_weight , y = Diameter))+
+  geom_point(size = 0.5, alpha = 0.5 )+
+  facet_grid()+
+   geom_smooth(color = 'red', alpha = 0.7)+
+   xlab("Weight of mollusk") +
+   ylab("Diameter of shell") +
+   ggtitle("Dependence of the weight of the mollusk and the diameter of its shell")
+
+```
+
+
+
+
+
