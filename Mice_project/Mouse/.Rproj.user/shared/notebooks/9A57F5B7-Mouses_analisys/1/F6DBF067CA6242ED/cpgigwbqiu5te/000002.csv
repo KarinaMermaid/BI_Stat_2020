@@ -1,4 +1,0 @@
-"0","BDNF_mean <- mouses %>%"
-"0","  group_by(class, MouseID) %>%"
-"0","  get_summary_stats(BDNF_N, type = ""mean_sd"")"
-"0","BDNF_mean"

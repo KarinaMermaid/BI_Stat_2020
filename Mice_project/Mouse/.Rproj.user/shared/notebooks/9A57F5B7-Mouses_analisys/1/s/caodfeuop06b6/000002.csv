@@ -1,6 +1,0 @@
-"0",""
-"0","mouses$class <- as.factor(mouses$class)"
-"0","mouses$Behavior <- as.factor(mouses$Behavior)"
-"0","mouses$Treatment <- as.factor(mouses$Treatment)"
-"0","mouses$Genotype <- as.factor(mouses$Genotype)"
-"0","mouses$MouseID <- as.factor(mouses$MouseID)"

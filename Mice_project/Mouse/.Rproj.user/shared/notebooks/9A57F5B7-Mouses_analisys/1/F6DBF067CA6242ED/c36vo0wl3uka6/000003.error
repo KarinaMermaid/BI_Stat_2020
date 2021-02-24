@@ -1,1 +1,0 @@
-{"frames":[{"func":"predict(lin_mod2, newdata = MyData, interval = \"confidence\")","file":"","line_number":0,"end_line_number":0,"character_number":0,"end_character_number":0}],"message":"Ошибка в UseMethod(\"predict\") :\n  нет подходящего метода для 'predict' применяемого к объекту класса \"data.frame\"\n"}

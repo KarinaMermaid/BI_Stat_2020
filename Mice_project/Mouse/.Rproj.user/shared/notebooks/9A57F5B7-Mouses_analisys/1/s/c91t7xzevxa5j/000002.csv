@@ -1,5 +1,0 @@
-"0","df_scores <- data.frame(mice_set,"
-"0","  scores(mouse_pca, display = ""sites"", choices = c(1:5), scaling = 1))"
-"0",""
-"0","ggplot(df_scores, aes(x = PC4, y = PC2, colour = class)) + "
-"0","  geom_point() + ggtitle(""Ordination in PC4 and PC2 space"")"

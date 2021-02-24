@@ -1,2 +1,0 @@
-"0","BDNF_N_without_NA <- mouses  %>% filter( !is.na(BDNF_N)) "
-"0","ggplot(BDNF_N_without_NA, aes(class, BDNF_N, color = class)) + stat_summary(fun.data = ""mean_cl_normal"") + ggtitle(label = ""BDNF expression versus class plot"")"

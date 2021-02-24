@@ -1,3 +1,0 @@
-"0","model_minimal_stand <- lm(formula = medv ~ lstat+rm +ptratio +black +rm*ptratio , data = bost_stand)"
-"2","Ошибка в is.data.frame(data) :объект 'bost_stand' не найден
-"

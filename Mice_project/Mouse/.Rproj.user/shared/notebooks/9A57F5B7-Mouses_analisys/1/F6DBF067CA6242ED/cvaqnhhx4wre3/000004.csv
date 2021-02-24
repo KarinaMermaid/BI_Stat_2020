@@ -1,3 +1,0 @@
-"0",""
-"0","ggplot(simple_diag2, aes(x = 1:nrow(simple_diag2), y = .cooksd)) +"
-"0","  geom_bar(stat = 'identity')"

@@ -1,7 +1,0 @@
-"0",""
-"0","pca_summary <- summary(mouse_pca)"
-"0","pca_result <- as.data.frame(pca_summary$cont)"
-"0","plot_data <- as.data.frame(t(pca_result[c(""Proportion Explained""),]))"
-"0","plot_data$component <- c(1:75)"
-"0",""
-"0","ggplot(plot_data, aes(component , `Proportion Explained`)) + geom_bar(stat = ""identity"") +ggtitle(label = ""Component contribution"")"
