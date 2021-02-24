@@ -1,0 +1,2 @@
+"0","class_count <- mouses %>% group_by(class) %>%  count() "
+"0","class_count"

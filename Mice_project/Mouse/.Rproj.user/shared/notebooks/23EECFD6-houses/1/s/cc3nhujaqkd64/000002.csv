@@ -1,0 +1,5 @@
+"0","Boston[,-4] %>%   gather(-medv, key = ""var"", value = ""value"") %>%   filter(var != ""chas"") %>%"
+"0","  ggplot(aes(x = value, y = medv)) +"
+"0","  geom_point() +"
+"0","  stat_smooth() +"
+"0","  facet_wrap(~ var, scales = ""free"")"

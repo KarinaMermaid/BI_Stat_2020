@@ -1,0 +1,2 @@
+"0",""
+"0","biplot(mouse_pca, display = ""species"", scaling = 2, choices = c(3,4))"

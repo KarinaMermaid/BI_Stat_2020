@@ -1,0 +1,2 @@
+"0","mouse_data <- read_excel('Data_Cortex_Nuclear.xls')"
+"0","count(mouse_data)"
