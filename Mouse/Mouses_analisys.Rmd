@@ -1,0 +1,447 @@
+---
+title: "Protein dynamics associated with learning in the Ts65Dn Mouse Model of Down Syndrome"
+date: "24/02/2021"
+
+output:
+   html_document:
+      toc: true
+      toc_depth: 3
+      toc_float: true
+
+
+    
+
+
+
+---
+```{r message=FALSE, warning=FALSE}
+library("readxl")
+library(dplyr)
+library(tidyr)
+library(stats)
+library(ggplot2)
+library(car)
+library(knitr)
+library(rstatix)
+library(evaluator)
+library(multcomp)
+library(vegan)
+library(plotly)
+library(ggthemes)
+theme_set(theme_bw())
+```
+
+## Data exploration
+
+### Case
+
+Briefly about the article: in this work, the researchers found out whether memantine is able to positively influence the learning ability of down mice (trisomy on chromosome 21). They described the effects of memantine on protein expression in brain regions of
+Ts65Dn mice exposed to context fear conditioning (CFC).
+
+For this purpose, the following experiment was set up: mice were placed in a novel cage, allowed to explore for three minutes and then given an electric shock. These mice are the context-shock (CS) group and learn to associate the context with the aversive stimulus. Learning is displayed by “freezing” upon re-exposure to the context, where freezing is defined as a lack of movement. A second group of mice were placed in the novel cage, immediately given the electric shock, and then allowed to explore for 3 min. These mice are the shock-context (SC) group and do not acquire conditioned fear. All mice received an injection of memantine or the equivalent volume of saline 15 minutes prior to exposure to the novel context. Eight groups of mice (7-10 per group) were used: trisomic and controls, CS mice injected with saline or with memantine and SC mice injected with saline or with memantine, as described
+
+![Experiment scheme](/home/karina_mermaid/R/Mouse/exp_model.png)
+
+ **Classes:** 
+ 
+   * c-CS-s: control mice, stimulated to learn, injected with saline **(9 mice)**
+   * c-CS-m: control mice, stimulated to learn, injected with memantine **(10 mice)**
+   * c-SC-s: control mice, not stimulated to learn, injected with saline **(9 mice)**
+   * c-SC-m: control mice, not stimulated to learn, injected with memantine **(10 mice)**
+
+   * t-CS-s: trisomy mice, stimulated to learn, injected with saline **(7 mice)**
+   * t-CS-m: trisomy mice, stimulated to learn, injected with memantine **(9 mice)**
+   * t-SC-s: trisomy mice, not stimulated to learn, injected with saline **(9 mice)**
+   * t-SC-m: trisomy mice, not stimulated to learn, injected with memantine **(9 mice)**
+   
+### Data description
+
+First, let's read the data and see how many observations we have
+
+```{r echo=TRUE, warning=FALSE}
+mouse_data <- read_excel('Data_Cortex_Nuclear.xls')
+count(mouse_data)
+
+```
+
+We see that there are much more observations than the mice were taken for the experiment (1080 vs 72). This means that repeated observations were made for the mice. Which mouse the repetition belongs to can serve as an important factor in further analysis, so we need to split the MouseID column into two: the ID itself and the repeatability
+
+```{r echo=TRUE}
+mouses <-  mouse_data %>% separate(col = MouseID, into = c("MouseID", "measurement"), sep = "_")
+```
+
+Let's also examine the data structure.
+
+```{r echo=TRUE}
+str(mouses)
+```
+
+ We see that such columns as ID, genotype, treatment, behavior and class are defined as character, however it is better to change them to a factor
+
+```{r echo=TRUE}
+
+mouses$class <- as.factor(mouses$class)
+mouses$Behavior <- as.factor(mouses$Behavior)
+mouses$Treatment <- as.factor(mouses$Treatment)
+mouses$Genotype <- as.factor(mouses$Genotype)
+mouses$MouseID <- as.factor(mouses$MouseID)
+```
+
+Let's also take a look at the representation of the classes. We can argue that the groups are more or less balanced
+
+```{r echo=TRUE}
+class_count <- mouses %>% group_by(class) %>%  count() 
+class_count
+```
+
+Let's also see how many missing values there are in the data and for whшср indicators. We also find out how many complete observations are in the dataset.
+
+```{r}
+mouse_na <- colSums(is.na(mouses))
+
+sum(is.na(mouses))
+
+as.table(mouse_na)
+
+# 
+mouses_without_na <- na.omit(mouses)
+count(mouses_without_na)
+
+```
+
+## Are there differences in the level of BDNF_N production depending on the class in the experiment ?
+
+There are 8 classes of mice in this dataset; 15 technical replicates were carried out for each of 72 mice. For pairwise comparison of a large number of classes, it is necessary to use ANOVA. I decided to consider the class to which the mouse and the mouse belong, as individual characteristics play an important role in the experiment. I did not use each of the class parameters separately, otherwise the analysis would be very cumbersome and complex. Unfortunately, I was unable to carry out anew test with the model lm(BDNF_N ~ class + MouseID , data = mouses). However, carrying out an analysis without taking into account the fact that we have repetitions in the data, I think it is incorrect. Below I have given the results of anova in case we do not take into account repetitions, and if we do take into account (for this I took the average values for each of the mice).
+
+### Chek assumptions
+
+First, let's group our data by class and ID variables and look at the summary statistics for the variable BDNF_N. I will also use the obtained statistics for anova based on averaged BDNF_N expression values.
+
+```{r echo=TRUE}
+BDNF_mean <- mouses %>%
+  group_by(class, MouseID) %>%
+  get_summary_stats(BDNF_N, type = "mean_sd")
+BDNF_mean
+```
+
+Let's remove the missing values of BDNF_N (we can do this since there are only 3 missing observations) and create box plots of the BDNF_N colored by class. We will not display individual mice on the graph, which will not clutter it up.
+
+```{r}
+BDNF_N_without_NA <- mouses  %>% filter( !is.na(BDNF_N)) 
+ggplot(BDNF_N_without_NA, aes(class, BDNF_N, color = class)) + stat_summary(fun.data = "mean_cl_normal") + ggtitle(label = "BDNF expression versus class plot")
+```
+Let's build a linear model of the dependence of the BDNF_N  expression on the class and ID of the mouse and check the applicability conditions using it (since ANOVA has similar applicability conditions to linear models).
+
+```{r}
+fit <- lm(BDNF_N ~ class , BDNF_N_without_NA)
+fit2 <- lm(mean ~ class, BDNF_mean)
+```
+
+We see that if only the mouse class is taken into account, the residuals plot looks good, the distribution looks normal. In the case of using averaged values, the plot of residuals raises doubts: the shift in median values, the dispersion between some groups is very different.
+
+```{r}
+simple_diag <- fortify(fit) 
+simple_diag2 <- fortify(fit2) 
+
+ggplot(simple_diag, aes(x = 1:nrow(simple_diag), y = .cooksd)) +
+  geom_bar(stat = 'identity')
+
+ggplot(simple_diag2, aes(x = 1:nrow(simple_diag2), y = .cooksd)) +
+  geom_bar(stat = 'identity')
+```
+```{r}
+ggplot(data = simple_diag, aes(x = class, y = .stdresid, colour = class)) +
+  geom_boxplot() + geom_hline(yintercept = 0)
+
+ggplot(data = simple_diag2, aes(x = class, y = .stdresid, colour = class)) +
+  geom_boxplot() + geom_hline(yintercept = 0)
+```
+
+```{r}
+qqPlot(fit, id = FALSE) 
+
+qqPlot(fit2, id = FALSE) 
+```
+
+
+
+
+### Computation
+
+In both cases, the ANOVA results indicate a difference in protein expression depending on the mouse class. However, in the case of using averaged values, the pvalue is close to 0.05, which may indicate that there is an insignificant difference. For more accurate conclusions, you need to look at the post-hack tests.
+
+```{r message=FALSE, warning=FALSE}
+
+res.aov <- anova_test(
+  data = BDNF_N_without_NA, dv = BDNF_N, wid = MouseID,
+  between = class
+  )
+res.aov
+
+
+res.aov2 <- anova_test(
+  data = BDNF_mean, dv = mean, wid = MouseID,
+  between = class
+  )
+res.aov2
+```
+The results of post-hock tests for a model built without taking into account replicates in the data show a much larger number of classes that differ in protein expression than for a model built using averaged values. That is, without taking into account the individual characteristics of the mouse, we can find more differences in the expression of BDNF. In fact, we can talk about a significant difference in the level of BDNF expression only among the groups c-SC-m & c-CS-s. Also close to the presence of significant differences in the expression (pvalue = 0.06) of the groups c-SC-m & c-CS-m. The obtained data is well displayed by "BDNF expression versus class plot". It can be assumed that these differences are due to the context of the experiment rather than the use of memantine.
+
+```{r message=FALSE, warning=FALSE}
+fit_inter <- lm(BDNF_N ~ class , data = BDNF_N_without_NA)
+dat_tukey <- glht(fit_inter, linfct = mcp(class = 'Tukey'))
+summary(dat_tukey)
+
+fit_inter2 <- lm(mean ~ class , data = BDNF_mean)
+dat_tukey2 <- glht(fit_inter2, linfct = mcp(class = 'Tukey'))
+summary(dat_tukey2)
+```
+
+## Predict the production level of ERBB4_N protein based on data on other proteins
+
+### Full linear model
+Let's built a linear model of the dependence of ERBB4_N expression on other proteins. We can notice that one of the proteins strongly influences the expression of the protein of interest PSD95_N. Three more proteins with good pvalues can also be distinguished: BAX_N  ,  Tau_N , pPKCG_N.
+
+```{r}
+lin_mod <- lm(ERBB4_N ~ . - MouseID - measurement - Genotype - Treatment -Behavior - class  , mouses)
+summary(lin_mod)
+```
+### Diagnostics
+
+In theory, based on this model, we can talk about the influence of some proteins on the ERBB4_N expression. But you must first diagnose the model, is it correct to use such a model. For this purpose, we will carry out its diagnostics.
+
+#### Multicollinearity check
+I have great suspicions that we will observe multicollinearity in this model, since proteins do not work separately, but are linked to each other in molecular cascades.
+
+At first, I ran into a difficulty when checking for multicollinearity, namely: there are aliased coefficients in the model. This happens (as I read) when faced with ideal multicollinearity. Such a predictor can be identified
+
+```{r}
+alias( lm( ERBB4_N ~ . - MouseID - measurement - Genotype - Treatment -Behavior - class , mouses ) )
+```
+
+
+```{r}
+lin_mod <- update(lin_mod, .~. - pS6_N)
+```
+
+Now we can continue diagnostics
+   
+```{r}
+head(vif(lin_mod))
+```
+As expected: we see multicollinearity among the majority of predictors, and a very large (96!)
+   
+#### Outliers
+On the plots of residuals and normality of distribution, we see outliers
+   
+```{r}
+lin_mod <- data.frame(fortify(lin_mod))
+
+gg_resid <- ggplot(data = lin_mod, aes(x = .fitted, y = .stdresid)) + 
+  geom_point() + 
+  geom_hline(yintercept = 0) +
+  geom_smooth(method = "lm") +
+  geom_hline(yintercept = 2, color = "red") +
+  geom_hline(yintercept = -2, color = "red") +
+   ggtitle("Plot of residuals from predicted values")
+gg_resid
+```
+   
+   
+```{r}
+qqPlot(lin_mod$.stdresid)
+```
+### Correction
+
+I consider it is better to build a linear model from the most significant predictors
+   
+```{r}
+lin_mod2 <- lm(ERBB4_N ~ PSD95_N + BAX_N + Tau_N  + pPKCG_N , mouses)
+summary(lin_mod2)
+```
+
+Here we see the absence of multicollinearity, however, the residual graph still looks bad, there are many outliers.
+
+```{r}
+vif(lin_mod2)
+```
+ 
+```{r}
+lin_mod2 <- data.frame(fortify(lin_mod2))
+
+gg_resid2 <- ggplot(data = lin_mod2, aes(x = .fitted, y = .stdresid)) + 
+  geom_point() + 
+  geom_hline(yintercept = 0) +
+  geom_smooth(method = "lm") +
+  geom_hline(yintercept = 2, color = "red") +
+  geom_hline(yintercept = -2, color = "red") +
+   ggtitle("Plot of residuals from predicted values")
+gg_resid2
+```
+   
+
+```{r}
+qqPlot(lin_mod2$.stdresid)
+```
+### Visulization
+
+We visualize the predicted values on an artificial dataset, where the most significant predictor PSD95_N is in the range from the minimum to the maximum value, and the rest of the predictors are equal to the mean.
+```{r}
+model <- lm(ERBB4_N ~ PSD95_N + BAX_N + Tau_N  + pPKCG_N , data = mouses)
+
+# Dataset for model prediction
+MyData <- data.frame(
+  PSD95_N = seq(min(mouses$PSD95_N), max(mouses$PSD95_N), length.out = 500),
+  BAX_N = mean(mouses$BAX_N),
+  pPKCG_N = mean(mouses$pPKCG_N),
+  Tau_N = mean(mouses$Tau_N)
+  )
+
+# Predicted values
+Predictions <- predict(model, newdata = MyData,  interval = 'confidence')
+MyData <- data.frame(MyData, Predictions)
+
+
+# Model prediction plot
+Pl_predict <- ggplot(MyData, aes(x = PSD95_N, y = fit)) +
+  geom_ribbon(alpha = 0.2, aes(ymin = lwr, ymax = upr)) +
+  geom_line() + 
+  geom_point(data= mouses, alpha = 0.2, color = 'plum4' , aes(y = ERBB4_N)) +
+  ggtitle("Multiple model prediction plot") +
+  labs(y="ERBB4_N - fitted")
+Pl_predict 
+```
+
+As a result, I built a model for predicting the expression of ERBB4_N depending on the expression of only a few proteins (the most significant ones). Since the model does not meet the conditions of applicability, I would not recommend using it.
+
+## PCA
+
+Principal component analysis allows us to reduce the dimension of the data, describe the relationship between a large number of features and rank them by importance.
+
+Our original dataset is very large, so we will only use a part of it, namely, we will use a data subset containing only complete observations. We will leave in it only information about the expression of various proteins and about the class of the mouse. Let's also look at the representation of classes.
+
+```{r}
+mice_set <- mouses_without_na[, -c(1, 2, 79, 80, 81,82)] 
+table(mice_set$class)
+```
+Let's do a principal component analysis for our data.
+
+```{r}
+mouse_pca <- rda(mice_set[, -77], scale = T)
+
+```
+ 
+First, let's find out how the components contribute. To do this, turn to the summary and visualize the Proportion Explained.
+
+```{r}
+
+pca_summary <- summary(mouse_pca)
+pca_result <- as.data.frame(pca_summary$cont)
+plot_data <- as.data.frame(t(pca_result[c("Proportion Explained"),]))
+plot_data$component <- c(1:75)
+
+ggplot(plot_data, aes(component , `Proportion Explained`)) + geom_bar(stat = "identity") +ggtitle(label = "Component contribution")
+```
+
+The first three components explain approximately 30, 17 and 10% of the variability.
+
+Also, to understand which components contribute to the greatest contribution, we plot the eigenvalues.
+
+```{r}
+screeplot(mouse_pca, type = "lines", bstick = TRUE)
+```
+
+Let's choose 4 components for analysis.
+
+### loading plots
+
+Loading plots allow you to evaluate the correlation of components with each other, as well as with the component axes. Let's look at some of these plots.
+
+```{r}
+biplot(mouse_pca, display = "species", scaling = 2, choices = c(1,2))
+
+biplot(mouse_pca, display = "species", scaling = 2, choices = c(1,4))
+
+biplot(mouse_pca, display = "species", scaling = 2, choices = c(2,3))
+
+biplot(mouse_pca, display = "species", scaling = 2, choices = c(2,4))
+
+biplot(mouse_pca, display = "species", scaling = 2, choices = c(3,4))
+
+
+```
+
+Unfortunately, due to the large amount of proteins, these graphs are not very descriptive.
+
+### Ordination in PCA
+
+Let's look at the ordination plots, which reflects the ordination / location of individual objects (mice) in space. We see that it is difficult to single out certain clusters. The most pronounced patterns are on the ordination chart for components 2 and 4. On it you can see that the mice are grouped by the context of the experiment (CS or SC).
+
+
+```{r}
+df_scores <- data.frame(mice_set,
+  scores(mouse_pca, display = "sites", choices = c(1:5), scaling = 1))
+
+ggplot(df_scores, aes(x = PC4, y = PC2, colour = class)) + 
+  geom_point() + ggtitle("Ordination in PC4 and PC2 space")
+```
+```{r}
+df_scores <- data.frame(mice_set,
+  scores(mouse_pca, display = "sites", choices = c(1:5), scaling = 1))
+
+ggplot(df_scores, aes(x = PC1, y = PC2, colour = class)) + 
+  geom_point() + ggtitle("Ordination in PC1 and PC2 space")
+```
+
+```{r}
+df_scores <- data.frame(mice_set,
+  scores(mouse_pca, display = "sites", choices = c(1:5), scaling = 1))
+
+ggplot(df_scores, aes(x = PC1, y = PC3, colour = class)) + 
+  geom_point() + ggtitle("Ordination in PC1 and PC3 space")
+```
+
+### 3D Vizualuzation
+
+Among the packages for 3D visualization of the first three components (plot3D, rgl and plotly), I chose plotly because it is very simple and intuitive, and as a result, you can get an interactive graph!
+It is difficult to single out individual patterns on the chart. Perhaps the averaged expression values for each mouse should have been taken, since 72 points would be better distinguishable on the graph.
+
+```{r message=FALSE, warning=FALSE}
+fig <-  plot_ly(df_scores, x =~PC1, y = ~PC2, z = ~PC3, color = ~class, size = 0.1  ) 
+fig
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+   

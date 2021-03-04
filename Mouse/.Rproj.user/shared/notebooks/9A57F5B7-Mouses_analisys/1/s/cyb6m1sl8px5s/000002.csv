@@ -1,0 +1,1 @@
+"0","mouses <-  mouse_data %>% separate(col = MouseID, into = c(""MouseID"", ""measurement""), sep = ""_"")"

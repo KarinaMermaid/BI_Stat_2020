@@ -1,0 +1,5 @@
+"0",""
+"0","  ggplot(Boston, aes(x = lstat, y = medv)) +"
+"0","  geom_point() +"
+"0","  stat_smooth()"
+"0",""

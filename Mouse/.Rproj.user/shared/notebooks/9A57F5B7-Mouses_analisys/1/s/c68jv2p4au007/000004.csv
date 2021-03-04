@@ -1,0 +1,2 @@
+"0","fig <-  plot_ly(df_scores, x =~PC1, y = ~PC2, z = ~PC3, color = ~class, size = 0.1  )"
+"0","fig"
