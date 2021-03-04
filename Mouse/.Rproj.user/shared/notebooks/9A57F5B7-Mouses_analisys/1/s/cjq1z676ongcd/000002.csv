@@ -1,0 +1,2 @@
+"0","mouse_pca <- rda(mice_set[, -77], scale = T)"
+"0",""

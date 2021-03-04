@@ -1,0 +1,501 @@
+---
+title: "Boston_houses"
+date: "30/11/2020"
+
+output:
+   html_document:
+      toc: true
+      toc_depth: 3
+      toc_float: true
+
+
+    
+
+
+
+---
+### Required packages
+For this analysis, we need the following packages:
+```{r libraries, echo=TRUE, message=FALSE, warning=FALSE}
+library(MASS)
+library(ggplot2)
+library(corrplot)
+library(dplyr)
+library(tidyr)
+library(car)
+library(psych)
+library(plyr)
+library(olsrr)
+library(grid)
+library(gridExtra)
+
+```
+
+```{r include=FALSE}
+theme_set(theme_bw())
+```
+
+## I. Data Exploration
+
+First, let's take a quick look at the dataframe and its structure.
+```{r}
+
+head(Boston)
+```
+
+
+```{r echo=TRUE}
+str(Boston)
+Boston$chas <- as.factor(Boston$chas)
+```
+The dataset contains 506 observations and 14 variables, including:
+
+ * **crim**: per capita crime rate by town.
+ * **zn**: proportion of residential land zoned for lots over 25,000 sq.ft.
+ * **indus**: proportion of non-retail business acres per town.
+ * **chas**: Charles River dummy variable (= 1 if tract bounds river; 0 otherwise).
+ * **nox**: nitrogen oxides concentration (parts per 10 million).
+ * **rm**: average number of rooms per dwelling.
+ * **age**: proportion of owner-occupied units built prior to 1940.
+ * **dis**: weighted mean of distances to five Boston employment centres.
+ * **rad**: index of accessibility to radial highways.
+ * **tax**: full-value property-tax rate per $10,000.* 
+ * **ptratio**: pupil-teacher ratio by town.
+ * **black**: 1000(Bk - 0.63)^2 where Bk is the proportion of blacks by town.
+ * **lstat**: lower status of the population (percent).
+ * **medv**: median value of owner-occupied homes in $1000s.
+ 
+***
+ 
+Is there ***any NA*** in our data?
+```{r echo=TRUE}
+colSums(is.na(Boston))
+
+```
+
+***
+
+ Let's also check the data for ***outliers***. According to boxsplot charts, there are many of outliers in variables such as 'black', 'crim', 'zn' and 'rm'.
+
+```{r echo=TRUE}
+Boston[,-4] %>%
+  gather(-medv, key = "var", value = "value") %>%
+  filter(var != "chas") %>%
+  ggplot(aes(x = '',y = value)) +
+  geom_boxplot(outlier.colour = "cornflowerblue", outlier.shape = 1) +
+  facet_wrap(~ var, scales = "free") 
+```
+***
+ 
+  We can take a look at the ***distribution*** of variables by plotting their histograms.
+  
+  Predictor histograms provide the following information:
+
+  * Most variables have shifted distribution ('crim', 'zn', 'black' and 'age')
+  * rad and tax seem to have two different peaks
+  * rm is normally distributed
+
+```{r echo=TRUE}
+
+multi.hist(Boston[,-4])
+```
+
+***
+
+  Let's build a ***scatterplot*** to have a quick look at the data.
+
+```{r echo=TRUE}
+plot(Boston[, -c( 2, 4, 6, 12)], col = 'cornflowerblue')
+```
+
+Summary: A brief analysis of the data provides the following observations:
+
+  * there are no missing values in the dataset
+  * many variables are not normally distributed and for them boxplot is characterized by the presence of outliers
+  * let's pay attention to the last graph, namely, pairwise comparisons of the medv variable with the rest of the variables. At first glance, it can be assumed that most of these plots indicate nonlinearity of the relationship between medv and other variables
+
+## II. Fitting predictors of multiple linear models
+
+### Standartisation
+
+  Before proceeding with the selection of the optimal linear model, it is necessary to standardize the variables which are not factor type, since they have different units of measurement.
+  
+```{r echo=TRUE}
+# Standartisation
+
+bost_stand <- as.data.frame(sapply(Boston[, -4], scale))
+head(bost_stand)
+```
+
+
+### Building a full model
+
+  A complete regression model was built for the parameter 'medv'. Below is the summary of this model. The most significant variables in the standardized data are 'lstat', 'ptaratio' and 'rm'. The same is true for  not standartiszated dataset. Further selection of the model was carried out on the initial data (Boston). The smallest contribution to the predictive ability of the model is made by such parameters as 'age' and 'indus' .The fraction of variance described by the full model is 0.7291 
+
+```{r echo=TRUE}
+# Full correlation model
+full_model_stand <- lm(medv~ ., data = bost_stand)
+full_model <- lm(medv~ ., data = Boston)
+summary(full_model_stand)
+summary(full_model)
+```
+
+
+### Selection of significant predictors
+
+  The least contributing predictors were discarded from the general model. We can see that the Adjusted R-squared has increased only to 0.7348 . 
+
+```{r}
+model_2 <- lm(formula = medv ~ . - indus - age , data = Boston)
+summary(model_2)
+```
+
+We diagnosed the resulting model in order to understand whether it can be improved, and also check the conditions of applicability of our model.
+
+## III. Model Diagnostics
+  
+  We have selected such a linear model whose predictors make a significant contribution to its predictive ability. However, before using this model for predictions, it is necessary to diagnose it and adjust.
+  
+### Checking the linearity of the relationship
+
+  The graph below shows that many variables are nonlinearly related to medv. We are especially interested in a variable such as lstat (located on a separate graph), as it is one of the most influential variables and it is parabolic in nature. Therefore, it is necessary to correct the model by adding I (lstat ^ 2) to the model.
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+Boston[,-4] %>%   gather(-medv, key = "var", value = "value") %>%   filter(var != "chas") %>%
+  ggplot(aes(x = value, y = medv)) +
+  geom_point() +
+  stat_smooth() +
+  facet_wrap(~ var, scales = "free")
+
+  ggplot(Boston, aes(x = lstat, y = medv)) +
+  geom_point() +
+  stat_smooth()
+
+```
+
+### Residual Analysis
+
+  The residuals plot indicates their uneven distribution. Heteroscedasticity is present, which indicates that prediction errors are different for different ranges of predicted values. This is not surprising since the relationship between predictors and the dependent variable is not linear.
+  
+  The quantile plot looks bad too, and we see the following:
+
+  * The variance is not completely constant, that is, the assumption of constant variance is not completely fulfilled.
+  * From the q-q plot we can see that this is not quite normal and is slightly offset to the right.
+  * Observed emissions
+
+```{r}
+model_2_diag <- data.frame(fortify(model_2), Boston[, -c(3, 7)])
+
+gg_medv_2 <- ggplot(data = model_2_diag, aes(x = .fitted, y = .stdresid)) + 
+  geom_point() + 
+  geom_hline(yintercept = 0) +
+  geom_smooth(method = "lm") +
+  geom_hline(yintercept = 2, color = "red") +
+  geom_hline(yintercept = -2, color = "red")
+gg_medv_2
+
+qqPlot(model_2_diag$.stdresid)
+```
+
+  We also built graphs for predictors that were not included in the model. We see that there are no unaccounted dependencies in our model.
+
+```{r echo=TRUE}
+res_1 <- gg_medv_2 + aes(x = age)
+res_2 <- gg_medv_2 + aes(x = indus)
+res_1
+res_2
+```
+
+***
+
+### Cook's distance graph
+  
+  We can use Cook's distance by examining whether an observation is a potential outlier or an influencing variable.Following the image on the graph, we can confirm the presenceof significant number of outliers. However, without information about how these observations were obtained, we cannot throw them out of the dataset. 
+  
+```{r}
+ols_plot_cooksd_bar(model_2)
+```
+
+***
+
+### Multicollinearity check
+
+  Checking for multicollinearity showed that our data have a very high level of predictor correlation. Correlation between predictors does not make our model unusable, but it is better to get rid of predictors that are highly correlated with others. A VIF of 1 indicates two variables are not correlated, a VIF between 2 and 5 indicates a moderate correlation, and a VIF above 5 indicates a high correlation. The variables tax and rad have the highest correlation coefficient, and the correlation coefficient between these variables (see corrplot) is 0.91. Let's try to remove the tax and rad variables from the analysis
+
+```{r}
+vif(full_model)
+```
+
+A correlation matrix was built to visualize the interactions between variables. Following the data, we can talk about the presence of a correlation between the following predictors:
+
+  * rm and lstat 
+  * rad and lstat
+  * rad and dis
+  * rad and tax
+  * nox and dis
+  * tax and lstat
+  * tax and crim
+
+
+```{r echo=TRUE}
+corr_matrix<-cor(Boston[,-4])
+corrplot.mixed(corr_matrix,  lower.col = "black", number.cex = .7,  order = "AOE")
+```
+```{r echo=TRUE}
+mod_2_vif <- update(full_model, .~. - tax -rad -indus -age)
+vif(mod_2_vif)
+```
+
+We can observe that the value of the VIF for predictors has dropped significantly. Variables 'nox' and 'dis' also have large VIF indicators, but we will not remove them from the model for now.
+ 
+## IV. Correction of the optimal model
+
+  Taking into account the data obtained during the analysis of the data and diagnostics of the model, the following corrections can be made:
+  
+   * adding  (lstat ^ 2) since this predictor is non-linear
+   * excluding predictors 'tax' and 'rad' as it contributes greatly to multicollinearity
+   * adding influential interactions between predictors to the model
+
+The elimination of 'tax' and 'rad' variables allowed us to  increase the value of R-squared to 0.7724.
+
+```{r}
+model_3 <- lm(formula = medv ~ . +I(lstat^2) - indus - age - tax -rad , data = Boston)
+summary(model_3)
+```
+
+
+We also excluded the predictor zn from the model since it makes not significant contribution. 
+
+```{r}
+model_4 <- lm(formula = medv ~ . + I(lstat^2) -indus - age -tax -rad - zn , data = Boston)
+
+summary(model_4)
+```
+
+ Adding interactions between predictors to the model increased the proportion of variance explained by the model. (R-square: 0.8254).
+
+```{r}
+model_5 <- lm(formula = medv ~ . + I(lstat^2) -indus -lstat - age - zn - tax -rad + rm*lstat + rm*ptratio + nox*dis + dis*lstat +crim*lstat, data = Boston)
+summary(model_5)
+```
+This model includes interactions between predictors with a high correlation coefficient, but we remember that the variables 'nox' and 'dis' have a high VIF value.Now they do not contribute significantly in our model. We threw them out of the model and looked to see if the R-squared value dropped significantly
+
+```{r}
+model_6 <-lm(formula = medv ~ . + I(lstat^2) -indus - age - zn - tax - rad - nox - dis +rm*ptratio +crim*lstat, data = Boston)
+
+summary(model_6)
+```
+We can see that R-squared dropped by 3 percent, while we removed the multicollinear variables
+
+
+### Diagnostic
+
+After the model was corrected, we ran the diagnostics again.
+To begin with, we will mark the points that we could not change when adjusting the model:
+* we were unable to influence the nonlinearity of the relationship between predictors and the dependent variable (excluding the variable lstat)
+* we were unable to get rid of heteroscedantics (see the residual graph). This means that prediction errors are different for a different range of predicted values
+* we did not discard outliers from the data, since we do not know if they are of particular importance or are errors in data collection. Therefore, we also see outliers on the residual and Cook's graph.
+
+Below are the graphs of the residuals of the original model and the adjusted one. We can notice that there are no improvements
+
+```{r}
+model_6_diag <- data.frame(fortify(model_6), Boston[, c(1, 4,6, 11, 12, 13)])
+
+gg_medv <- ggplot(data = model_6_diag, aes(x = .fitted, y = .stdresid)) + 
+  geom_point() + 
+  geom_hline(yintercept = 0) +
+  geom_smooth(method = "lm") +
+  geom_hline(yintercept = 2, color = "red") +
+  geom_hline(yintercept = -2, color = "red")
+
+gg_medv_2
+gg_medv
+
+```
+```{r}
+ols_plot_cooksd_bar(model_2)
+ols_plot_cooksd_bar(model_6)
+```
+
+* below are the quantile plots of the linear model before and after correction. We can see that the distribution hasn't gotten better, and it is still different from the ideal normal distribution.
+
+```{r}
+qqPlot(model_2_diag$.stdresid)
+qqPlot(model_6_diag$.stdresid)
+```
+
+Nevertheless, we managed to increase R-squared of the model, as well as make it a little more suitable for the conditions of applicability:
+
+* we took into account the nonlinearity of the relationship between the dependent variable and lstat, it was squared for a better fit
+* we also added interactions between predictors
+* we have removed the variables with the largest VIF, for the remaining variables their value is below 4
+
+
+
+```{r echo=TRUE}
+model_6_stand <-lm(formula = medv ~ . + I(lstat^2) -indus - age - zn - tax - rad - nox - dis +rm*ptratio +crim*lstat, data = bost_stand)
+vif(model_6_stand)
+
+```
+
+
+## V. Prediction 
+So, our final multiple linear model predicting the average cost of houses in Boston includes predictors such as crime rate by town (crim), is the river adjacent to the site (chas), average number of rooms per dwelling (rm), pupil-teacher ratio by town (ptratio), percrnt of lower status of the population (lstat), the proportion of blacks by town (black). Our model also includes the squared values of the lstat variable, since the lstat variable contributes most to the predictive power of the model and has an abnormal distribution and non-linear relationship with the dependent variable.
+
+MEDV = -13.5*lstat + 9.7*I(lstat^2)+ 4.8*chas + 3.4*crim + 11.8*rm + 9*ptratio + 3*black -10rm:ptratio -4.7*lstat:crim
+
+An artificial dataset was created to predict the model. The variable lstat was selected as the target predictor. Thus, the graph of predictions built on this dataset shows how the dependent variable changes when lstat changes, provided that all other variables have average values.
+
+We see that the prediction graph of our model is non-linear, which casts doubt on the validity of our model. We also built a simple linear model where only lstat is the predictor. The prediction graph of such a model has a linear form
+
+```{r}
+
+model_final <- lm(formula = medv ~ lstat + I(lstat^2)  +crim +rm +ptratio +black +rm*ptratio +crim*lstat, data = Boston)
+summary(model_final)
+# Dataset for model prediction
+MyData <- data.frame(
+  lstat = seq(min(Boston$lstat), max(Boston$lstat), length.out = 100),
+  ptratio = mean(Boston$ptratio),
+  crim = mean(Boston$crim),
+  rm = mean(Boston$rm),
+  black = mean(Boston$black),
+  rad = mean(Boston$rad))
+
+
+
+# Predicted values
+Predictions <- predict(model_final, newdata = MyData,  interval = 'confidence')
+MyData <- data.frame(MyData, Predictions)
+
+# Model prediction plot
+Pl_predict <- ggplot(MyData, aes(x = lstat, y = fit)) +
+  geom_ribbon(alpha = 0.2, aes(ymin = lwr, ymax = upr)) +
+  geom_line() + 
+  ggtitle("Multiple model")
+Pl_predict 
+```
+
+```{r echo=TRUE}
+simple_model <- lm(formula = medv ~ lstat, data = Boston)
+summary(simple_model)
+# Dataset for model prediction
+s_m_newdata <- data.frame(lstat = seq(min(Boston$lstat), max(Boston$lstat), length.out = 100)) 
+
+medv_predicted <- predict(simple_model, newdata = s_m_newdata, interval = "confidence") 
+simple_data <- data.frame(s_m_newdata, medv_predicted) 
+
+
+simple_predict <- ggplot(simple_data, aes(x = lstat, y = fit)) +
+  geom_line() +
+  geom_ribbon(alpha = 0.2, aes(ymin = lwr, ymax = upr)) + 
+  ggtitle("Simple model")
+
+grid.arrange(Pl_predict, simple_predict, ncol = 2)
+```
+We briefly checked the simple linear model against the applicability conditions:
+* the plot of residuals indicates the presence of heteroscedantism. This was expected, since the lstat variable has a hyperbolic dependence on the medv variable.
+* Cook's distance graph indicates the presence of outliers
+* the quantile graph shows that the distribution is different from normal
+
+```{r}
+summary(simple_model)
+simple_model_diag <- data.frame(fortify(simple_model), Boston)
+
+gg_medv_simp <- ggplot(data = simple_model_diag, aes(x = .fitted, y = .stdresid)) + 
+  geom_point() + 
+  geom_hline(yintercept = 0) +
+  geom_smooth(method = "lm") +
+  geom_hline(yintercept = 2, color = "red") +
+  geom_hline(yintercept = -2, color = "red")
+
+gg_medv_simp
+
+qqPlot(simple_model_diag$.stdresid)
+ols_plot_cooksd_bar(simple_model)
+
+
+```
+
+***Summary:*** We have fitted a linear model that predicts the average cost of houses in Boston with a probability of 79%. However, it should be noted that it is far from ideally consistent with the conditions of applicability of the multiple linear model, which should be taken into account when interpreting it. Nevertheless, when working with real data, it is usually difficult to find a model that meets all the conditions of applicability.
+As a result, we found that the linear regression model we built has a non-linear form.
+
+
+We also built a multiple linear model without correction for the nonlinear dependence of the lstat and medv variables. We had to exclude from this model the variable crim and its relationship with the variable lstat, since they lost their significance for the model. The R-squared of this model is 75%, while for a simple linear model it is only 54%. The prediction graph of such a model has a linear form.
+
+```{r}
+model_minimal <- lm(formula = medv ~ lstat    +rm +ptratio +black +rm*ptratio , data = Boston)
+
+# Dataset for model prediction
+MyData_min <- data.frame(
+  lstat = seq(min(Boston$lstat), max(Boston$lstat), length.out = 100),
+  ptratio = mean(Boston$ptratio),
+  rm = mean(Boston$rm),
+  black = mean(Boston$black),
+  rad = mean(Boston$rad)  )
+# Predicted values
+Predictions_min <- predict(model_minimal, newdata = MyData_min,  interval = 'confidence')
+MyData_min <- data.frame(MyData_min, Predictions_min)
+
+# Model prediction plot
+Pl_predict_min <- ggplot(MyData_min, aes(x = lstat, y = fit)) +
+  geom_ribbon(alpha = 0.2, aes(ymin = lwr, ymax = upr)) +
+  geom_line() + 
+  ggtitle("Multiple model")
+grid.arrange(Pl_predict_min, simple_predict, ncol = 2)
+
+```
+
+The diagnostics of this model also indicates that it does not meet the conditions of applicability.
+
+
+```{r}
+summary(model_minimal)
+model_min_diag <- data.frame(fortify(model_minimal), Boston[, c( 4,6, 11, 12, 13)])
+
+gg_medv_min <- ggplot(data = model_min_diag, aes(x = .fitted, y = .stdresid)) + 
+  geom_point() + 
+  geom_hline(yintercept = 0) +
+  geom_smooth(method = "lm") +
+  geom_hline(yintercept = 2, color = "red") +
+  geom_hline(yintercept = -2, color = "red")
+
+gg_medv_min
+
+qqPlot(model_min_diag$.stdresid)
+ols_plot_cooksd_bar(model_minimal)
+model_minimal_stand <- lm(formula = medv ~ lstat+rm +ptratio +black +rm*ptratio , data = bost_stand)
+vif(model_minimal_stand)
+```
+
+## Conclusion.
+In this study, a selection of a multiple linear model was carried out to predict the value of houses in Boston depending on various variables. A simple linear model was built, as well as several multiple ones, among which: a full model, including all predictors; the optimal model with the correction of the nonlinearity of the relationship between the predictor lstat and the dependent variable and the optimal model without this correction.
+
+All of the models are characterized by non-compliance with the conditions of applicability. We consider Boston data is not suitable for selecting a correct linear model, however, in a situation, if the customer asks us about it, we can provide the following analysis results for each multiple model. 
+
+***Full model***
+The full linear model includes all predictors and explains 73% of the variance in the dependent variable. We do not recommend using this model to predict the value of houses, as it:
+* includes variables that do not significantly contribute to describing the variability of the dependent variable
+* includes collinear predictors
+* has the smallest R-squared value
+
+***Optimal model with the correction of the nonlinearity of the relationship between the predictor and the dependent variable***
+This model has the largest  R-squared value and explains 79% of the variance in the dependent variable. From this model of exclusion, predictors that do not contribute significantly, as well as those that exhibit multicollinearity. The advantage of this model is that it takes into account the nonlinearity of the relationship between lstat and medv, but this model has a nonlinear prediction graph, which means that the model changes its behavior depending on the value of the predictors, which is quite difficult to take into account. Also, this model includes quite a few predictors, and it will be difficult for the customer to take into account all of them.
+
+***Otimal model without I(lstat^2)***
+The R-squared value of this model is 4% less than the previous one, but it includes the variables most significant for prediction and the graph of its predictions behaves linearly on the data
+
+***
+
+The client was interested in what the ideal neighborhood should look like and what aspects should be paid attention to in order to maximize the price of the house.
+
+Based on the data of the linear model, we first of all advise you to pay attention to the percentage of the population of the lowest class, namely, the customer should choose an area with a minimum percentage. In this case, there will also be less crime in this area.
+Also  the more rooms a house has, the more its value will be. This is supported by our model.
+The ratio of the number of students to the number of teachers will also affect the price. The customer should choose the area where the more elite / private schools are located. It will also increase the value of the home, as the area is considered more elite.
+
+That is, for the construction of expensive houses, the customer first of all needs to select areas with a minimum number of people with a low status (such areas will also be safer), with private / elite schools. A large number of rooms will increase the value of the house.
+
+
+
+
+
+

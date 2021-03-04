@@ -1,0 +1,32 @@
+{
+    "id": "9F16F5EC",
+    "path": null,
+    "project_path": null,
+    "type": "r_dataframe",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1613995745115.0,
+    "source_on_save": false,
+    "relative_order": 3,
+    "properties": {
+        "expression": "mouses_without_na",
+        "caption": "mouses_without_na",
+        "totalObservations": 552,
+        "displayedObservations": 552,
+        "variables": 83,
+        "cacheKey": "52339105",
+        "object": "mouses_without_na",
+        "environment": "",
+        "contentUrl": "grid_resource/gridviewer.html?env=&obj=mouses_without_na&cache_key=52339105&max_cols=50",
+        "preview": 0
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1613745126,
+    "encoding": "",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1613995745115,
+    "read_only": false,
+    "read_only_alternatives": []
+}
