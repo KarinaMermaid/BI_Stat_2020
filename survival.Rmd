@@ -1,0 +1,145 @@
+---
+title: "Survival"
+author: "Sogomonyan Karina"
+date: "06 03 2021"
+output: html_document
+---
+
+```{r message=FALSE, warning=FALSE}
+library(survival)
+library(dplyr)
+library(ggplot2)
+library(survminer)
+library(ranger)
+library(dplyr)
+library(ggfortify)
+library(coin)
+theme_set(theme_bw())
+```
+
+
+## Data exploration
+
+Let's look on our data
+
+```{r}
+dt <- ovarian
+head(dt)
+```
+Description: Survival in a randomised trial comparing two treatments for ovarian cancer
+
+ * **futime**:	survival or censoring time
+ * **fustat**:	censoring status
+ * **age**:	in years
+ * **resid.ds**:	residual disease present (1=no,2=yes)
+ * **rx**:	treatment group
+ * **ecog.ps**:	ECOG performance status (1 is better, see reference)
+
+
+Let's evaluate the data structure. We can see that all variables are defined as numeric, while fustat, resid.ds, rx and ecog.ps. are factorial variables 
+ 
+```{r}
+str(dt)
+dt$resid.ds <- as.factor(dt$resid.ds)
+dt$rx <- as.factor(dt$rx)
+dt$ecog.ps <- as.factor(dt$ecog.ps)
+dt$fustat <- as.factor(dt$fustat)
+
+```
+The data types are now correct:
+
+```{r}
+str(dt)
+```
+It's great that there are no missing values in our data.
+
+```{r}
+colSums(is.na(dt))
+```
+
+Let's look at the distribution of futime and age of the subjects. Although the distribution of age is not entirely normal, but judging by the mean and median of this variable, we can conditionally assume that 55 is the average age of the subjects.
+
+```{r}
+hist(dt$futime)
+hist(dt$age)
+median(dt$age)
+mean(dt$age)
+```
+
+We can divide the subjects into middle age and old, for further analysis.
+
+```{r}
+dt$age_group <- ifelse(dt$age > 55, 'old', 'middle')
+dt$age_group <- as.factor(dt$age_group)
+```
+
+ 
+ 
+##  Kaplan–Meier curves 
+
+To begin with, we will set a time interval within which we will assess the survival rate. + indicates censored data points.
+
+```{r}
+km <- Surv(time = ovarian$futime, event = ovarian$fustat)
+km
+```
+
+The next step is to build the Kaplan-Meier curves. A summary of the fit1 object shows survival times, the proportion of surviving patients and treatment groups.
+
+```{r}
+fit1 <- survfit(km ~ rx, data = dt)
+summary(fit1)
+```
+
+Now let's visualize how the treatment group affects survival.
+
+```{r}
+ggsurvplot(fit1, data = dt, pval = TRUE)
+```
+
+A p-value of a log rank of 0.3 indicates that none of the treatments studied were significantly better in this study, although patients treated with treatment 2 do better at first.
+ 
+Let's evaluate how other factors affect survival, for example, age:
+
+```{r}
+fit2 <- survfit(km ~ age_group, data = dt)
+ggsurvplot(fit2, data = dt, pval = TRUE)
+```
+
+In this graph, the Kaplan-Meier curve looks different: the curves diverge much earlier. The p-value indicates the presence of statistically significant differences in the survival rates of groups of different ages.
+
+We will also find out how residual disease status affects survival. This factor is almost significant.
+
+```{r}
+fit3 <- survfit(km ~ resid.ds, data = dt)
+ggsurvplot(fit3, data = dt, pval = TRUE)
+```
+
+We will also conduct log-rank tests separately. They match the values on the graphs. Thus, we can speak of a statistically significant difference only between groups differing in age.
+
+```{r}
+survdiff(km ~ resid.ds, data = dt)
+survdiff(km ~ age_group, data = dt)
+survdiff(km ~ rx, data = dt)
+```
+## Cox proportional hazard models
+ 
+Let's look at the Cox proportional hazards model. As far as I understand, while the Kaplan-Meier curves estimate the probability of survival, the Cox model calculates the risk of death and the corresponding risk coefficients. Therefore, the results of these methods may vary.
+ 
+```{r}
+fit.coxph <- coxph(km ~ rx + resid.ds + age_group + ecog.ps, 
+                   data = dt)
+summary(fit.coxph)
+```
+
+```{r}
+ggforest(fit.coxph, data = dt)
+```
+
+
+From this graph it follows that the type of treatment and the age group of the patient are significant factors for survival. People who received the second type of treatment have a lower risk of dying (hazard ratio 0.28) than those who received the first type of treatment, and also older people have a greater risk of dying (hazard ratio 5.72). Although the Kplan-Meier score also indicated a statistically significant effect of factors such as age group and type of treatment, the p-values were different.
+ 
+
+## Conclusion
+As a result, the age groups differ significantly in terms of survival, and almost significantly - the groups that received different treatments. The most significant factor influencing the risks is belonging to the age group, and the type of treatment also significantly affects the risks.
+
