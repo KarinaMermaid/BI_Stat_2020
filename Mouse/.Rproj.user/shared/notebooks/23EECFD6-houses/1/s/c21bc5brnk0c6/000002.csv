@@ -1,6 +1,0 @@
-"0","Boston[,-4] %>%"
-"0","  gather(-medv, key = ""var"", value = ""value"") %>%"
-"0","  filter(var != ""chas"") %>%"
-"0","  ggplot(aes(x = '',y = value)) +"
-"0","  geom_boxplot(outlier.colour = ""cornflowerblue"", outlier.shape = 1) +"
-"0","  facet_wrap(~ var, scales = ""free"") "

@@ -1,3 +1,0 @@
-"0",""
-"0","ggplot(data = simple_diag2, aes(x = class, y = .stdresid, colour = class)) +"
-"0","  geom_boxplot() + geom_hline(yintercept = 0)"

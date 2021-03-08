@@ -1,8 +1,0 @@
-"0","# посмотрим на "
-"0","mouses[,2:20] %>%"
-"0","  gather( key = ""var"", value = ""value"") %>%"
-"0","  ggplot(aes(x = '',y = value)) +"
-"0","  geom_boxplot(outlier.colour = ""cornflowerblue"", outlier.shape = 1) +"
-"0","  facet_wrap(~ var, scales = ""free"") "
-"2","
-"

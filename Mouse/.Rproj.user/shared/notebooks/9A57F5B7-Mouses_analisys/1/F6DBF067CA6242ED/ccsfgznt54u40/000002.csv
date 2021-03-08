@@ -1,2 +1,0 @@
-"0","fit <- lm(BDNF_N ~ class , BDNF_N_without_NA)"
-"0","fit2 <- lm(mean ~ class, BDNF_mean)"

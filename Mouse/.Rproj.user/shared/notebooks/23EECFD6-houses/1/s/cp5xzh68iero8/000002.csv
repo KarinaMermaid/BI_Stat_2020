@@ -1,4 +1,0 @@
-"0","# Standartisation"
-"0",""
-"0","bost_stand <- as.data.frame(sapply(Boston[, -4], scale))"
-"0","head(bost_stand)"
